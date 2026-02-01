@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "express": "^5.2.1",
+    "express-handlebars": "^8.0.3",
+    "express-session": "^1.19.0",
+    "mysql2": "^3.16.2",
+    "sequelize": "^6.37.7"
+  }
+}
