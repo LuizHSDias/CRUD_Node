@@ -14,111 +14,171 @@ app.engine('hbs', hbs.engine({
 app.set('view engine', 'hbs');
 
 app.use(express.static('public'));
-app.use(bodyParser.urlencoded({extended:false}));
+app.use(bodyParser.urlencoded({ extended: false }));
 
 // IMPORTAR MODEL USUARIOS
 const Usuario = require('./models/Usuario');
 
 app.use(session({
     secret: 'CriarUmaChaveQualquer1324!blablaba',
-    resave: false ,
+    resave: false,
     saveUninitialized: true
-}))
+}));
+
+// ================= ROTAS =================
 
 app.get('/', (req, res) => {
 
-    if(req.session.erros){
-        var arrayErros = req.session.erros;
-        req.session.erros = "";
-        return res.render('index', {NavActiveCad:true, error:arrayErros})
+    if (req.session.erros) {
+        const arrayErros = req.session.erros;
+        req.session.erros = null;
+        return res.render('index', { NavActiveCad: true, error: arrayErros });
     }
 
-    if(req.session.success){
+    if (req.session.success) {
         req.session.success = false;
-        return res.render('index', {NavActiveCad:true, MsgSuccess:true})
+        return res.render('index', { NavActiveCad: true, MsgSuccess: true });
     }
 
-    res.render('index', {NavActiveCad:true});
-
-})
+    res.render('index', { NavActiveCad: true });
+});
 
 app.get('/users', (req, res) => {
-    Usuario.findAll().then((valores) => {
-        // console.log(valores.map(valores => valores.toJSON()));
-        if(valores.length > 0){
-            return res.render('users', {NavActiveUsers:true, table:true, usuarios: valores.map(valores => valores.toJSON() )});
-        } else {
-            res.render('users', {NavActiveUsers:true, table: false});
-        }
-    }).catch((err) => {
-        console.log(`Houve um problema: ${err}`);
-    })
-    // res.render('users', {NavActiveUsers:true});
-})
+    Usuario.findAll()
+        .then((valores) => {
+            if (valores.length > 0) {
+                return res.render('users', {
+                    NavActiveUsers: true,
+                    table: true,
+                    usuarios: valores.map(v => v.toJSON())
+                });
+            } else {
+                return res.render('users', {
+                    NavActiveUsers: true,
+                    table: false
+                });
+            }
+        })
+        .catch((err) => {
+            console.log(`Houve um problema: ${err}`);
+        });
+});
 
-app.get('/editar', (req, res) => {
-    res.render('editar');
-})
+app.post('/editar', (req, res) => {
+    const id = req.body.id;
+
+    Usuario.findByPk(id)
+        .then((dados) => {
+            return res.render('editar', {
+                error: false,
+                id: dados.id,
+                nome: dados.nome,
+                email: dados.email
+            });
+        })
+        .catch(() => {
+            return res.render('editar', {
+                error: true,
+                problema: 'Não é possível editar esse registro'
+            });
+        });
+});
+
+// ================= CADASTRO =================
 
 app.post('/cad', (req, res) => {
-   // VALORES VINDO DO FORMULÁRIO
-   var nome = req.body.nome;
-   var email = req.body.email;
 
-   // ARRAY QUE VAI CONTER OS ERROS 
-   const erros = [];
+    let nome = req.body.nome || '';
+    let email = req.body.email || '';
 
-   // REMOVER OS ESPAÇOS EM BRANCO ANTES E DEPOIS
-   nome = nome.trim();
-   email = email.trim();
+    const erros = [];
 
-   // LIMPAR O NOME DE CARACTERES ESPECIAIS (APENAS LETRAS)
-   nome = nome.replace(/[^A-zÀ-ú\s]/gi,'');
-   console.log(nome);
+    // TRIM
+    nome = nome.trim();
+    email = email.trim();
 
-   // VERIFICAR SE ESTÁ VAZIO OU NÃO CAMPO 
-   if (nome == '' || typeof nome == undefined || nome == null){
-    erros.push({mensagem: "Campo nome não pode ser vazio!"});
-   }
+    // LIMPAR NOME (APENAS LETRAS E ESPAÇOS)
+    nome = nome.replace(/[^A-Za-zÀ-ÿ\s]/g, '');
 
-   // VERIFICAR SE O CAMPO NOME É VÁLIDO (APENAS LETRAS)
-   if(!/^[A-Za-záàâãéèêíïóôõöúçñÁÀÂÃÉÈÍÏÓÔÕÖÚÇÑ\s]+$/.test(nome)){
-    erros.push({mensagem:"Nome inválido!"});
-   }
-
-   // VERIFICAR SE ESTÁ VAZIO OU NÃO CAMPO 
-   if (email == '' || typeof email == undefined || email == null){
-    erros.push({mensagem: "Campo email não pode ser vazio!"});
-   }
-
-   // VERIFICAR SE EMAIL É VÁLIDO
-   if (!/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/.test(email)){
-    erros.push({mensagem:"Campo email inválido!"});
+    // VALIDAR NOME
+    if (!nome) {
+        erros.push({ mensagem: 'Campo nome não pode ser vazio!' });
+    } else if (!/^[A-Za-zÀ-ÿ\s]+$/.test(nome)) {
+        erros.push({ mensagem: 'Nome inválido!' });
     }
 
-    if(erros.length > 0){
-        console.log(erros);
+    // VALIDAR EMAIL
+    if (!email) {
+        erros.push({ mensagem: 'Campo email não pode ser vazio!' });
+    } else if (!/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/.test(email)) {
+        erros.push({ mensagem: 'Campo email inválido!' });
+    }
+
+    // SE HOUVER ERROS
+    if (erros.length > 0) {
         req.session.erros = erros;
         req.session.success = false;
         return res.redirect('/');
     }
 
-    // SUCESSO NENHUM ERRO
-    // SALVAR NO BANCO DE DADOS
-
+    // SALVAR NO BANCO
     Usuario.create({
         nome: nome,
         email: email.toLowerCase()
-    }).then(function(){
-        console.log('Cadastrado com sucesso!');
-        req.session.success = true;
-        return res.redirect('/');
-    }).catch(function(erro){
-        console.log(`Ops, houve um erro: ${erro}`)
     })
-   
+        .then(() => {
+            req.session.success = true;
+            return res.redirect('/');
+        })
+        .catch((erro) => {
+            console.log(`Erro ao cadastrar: ${erro}`);
+        });
+});
 
-})
+// ================= UPDATE =================
+
+app.post('/update', (req, res) => {
+
+    let nome = req.body.nome || '';
+    let email = req.body.email || '';
+
+    const erros = [];
+
+    nome = nome.trim();
+    email = email.trim();
+
+    nome = nome.replace(/[^A-Za-zÀ-ÿ\s]/g, '');
+
+    if (!nome) {
+        erros.push({ mensagem: 'Campo nome não pode ser vazio!' });
+    } else if (!/^[A-Za-zÀ-ÿ\s]+$/.test(nome)) {
+        erros.push({ mensagem: 'Nome inválido!' });
+    }
+
+    if (!email) {
+        erros.push({ mensagem: 'Campo email não pode ser vazio!' });
+    } else if (!/^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/.test(email)) {
+        erros.push({ mensagem: 'Campo email inválido!' });
+    }
+
+    if (erros.length > 0) {
+        return res.status(400).send({ status: 400, erro: erros });
+    }
+
+    Usuario.update(
+        {
+            nome: nome,
+            email: email.toLowerCase()
+        },
+        {
+            where: { id: req.body.id }
+        }
+    )
+        .then(() => res.redirect('/users'))
+        .catch((err) => console.log(err));
+});
+
+// ================= SERVER =================
 
 app.listen(PORT, () => {
     console.log(`Servidor rodando em http://localhost:${PORT}`);
