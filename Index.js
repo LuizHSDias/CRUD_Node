@@ -178,6 +178,18 @@ app.post('/update', (req, res) => {
         .catch((err) => console.log(err));
 });
 
+app.post('/del', (req, res) => {
+    Usuario.destroy({
+        where:{
+            id: req.body.id
+        }
+    }).then((retorno) => {
+        return res.redirect('/users');
+    }).catch((err) => {
+        console.log(err);
+    })
+})
+
 // ================= SERVER =================
 
 app.listen(PORT, () => {
